@@ -1,0 +1,18 @@
+server.name: "kibana"
+
+server.host: "0.0.0.0"
+
+elasticsearch.hosts: "http://{{ groups["elastic"][0] }}:9200"
+
+logging:
+  appenders:
+    file:
+      type: file
+      fileName: /var/log/kibana/kibana.log
+      layout:
+        type: json
+  root:
+    appenders:
+      - default
+      - file
+

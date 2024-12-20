@@ -1,0 +1,43 @@
+---
+
+- name: Kibana
+  hosts: kibana
+  become: yes
+  tasks:
+    - name: Install required packages
+      ansible.builtin.apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - wget
+        state: present
+        update_cache: yes
+
+    - name: Add the Kibana repository from Yandex mirror
+      shell: echo "deb [trusted=yes] https://mirror.yandex.ru/mirrors/elastic/8/ stable main" | tee /etc/apt/sources.list.d/elastic-8.x.list
+
+    - name: Update APT cache
+      ansible.builtin.apt:
+        update_cache: yes
+
+    - name: Install Kibana
+      ansible.builtin.apt:
+        name: kibana
+        state: present
+
+#    - name: Replace kibana.yml by template
+#      template:
+#        force: yes
+#        src: /home/markin/ansible/configs/kibana.j2
+#        dest: /etc/kibana/kibana.yml
+
+    - name: systemctl daemon-reload
+      become: yes
+      shell: systemctl daemon-reload
+
+
+    - name: Enable and start Kibana service
+      ansible.builtin.systemd:
+        name: kibana
+        enabled: yes
+        state: started

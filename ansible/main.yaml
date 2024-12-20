@@ -1,0 +1,8 @@
+---
+
+- import_playbook: WEB.yaml
+- import_playbook: Prometheus.yaml
+- import_playbook: Elastic.yaml
+- import_playbook: Kibana.yaml
+- import_playbook: Docker.yaml
+- import_playbook: Grafana.yaml

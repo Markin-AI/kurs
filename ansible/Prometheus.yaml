@@ -1,0 +1,138 @@
+---
+
+- name: Установка Prometheus
+  hosts: prometheus
+  gather_facts: no
+  become: true
+  tasks:
+    - name: Убедиться, что wget установлен
+      ansible.builtin.apt:
+        name: wget
+        state: present
+        update_cache: yes
+
+    - name: Создаем пользователя и группу для Prometheus
+      ansible.builtin.user:
+        name: prometheus
+        shell: /usr/sbin/nologin
+        comment: "Prometheus User"
+
+    - name: Скачиваем Prometheus
+      ansible.builtin.get_url:
+        url: "https://github.com/prometheus/prometheus/releases/download/v2.46.0/prometheus-2.46.0.linux-amd64.tar.gz"
+        dest: "/tmp/prometheus.tar.gz"
+
+    - name: Создаем директории для Prometheus
+      ansible.builtin.file:
+        path: /usr/local/prometheus
+        state: directory
+        owner: prometheus
+        group: prometheus
+        mode: '0755'
+
+    - name: Распаковываем Prometheus
+      ansible.builtin.unarchive:
+        src: "/tmp/prometheus.tar.gz"
+        dest: "/usr/local/prometheus"
+        remote_src: yes
+        extra_opts: [--strip-components=1]
+
+    - name: Создаем директории для Prometheus
+      ansible.builtin.file:
+        path: /etc/prometheus
+        state: directory
+        owner: prometheus
+        group: prometheus
+        mode: '0755'
+
+    - name: Создаем директорию для данных Prometheus
+      ansible.builtin.file:
+        path: /var/lib/prometheus
+        state: directory
+        owner: prometheus
+        group: prometheus
+        mode: '0755'
+
+    - name: Копирование файлов консоли из директории установки Prometheus
+      ansible.builtin.copy:
+        src: /usr/local/prometheus/consoles
+        dest: /etc/prometheus/
+        owner: prometheus
+        group: prometheus
+        mode: '0755'
+        remote_src: yes
+
+    - name: Копирование библиотек консолей
+      ansible.builtin.copy:
+        src: /usr/local/prometheus/console_libraries
+        dest: /etc/prometheus/
+        owner: prometheus
+        group: prometheus
+        mode: '0755'
+        remote_src: yes
+
+    - name: Создаем директорию для данных Prometheus
+      ansible.builtin.file:
+        path: /etc/prometheus/prometheus.yml
+        state: touch
+        owner: prometheus
+        group: prometheus
+        mode: '0644'
+
+    - name: Обновляем конфигурацию Prometheus для NGINX Log Exporter и Node Exporter
+      ansible.builtin.blockinfile:
+        dest: /etc/prometheus/prometheus.yml
+        content: |
+          global:
+            scrape_interval: 15s
+          scrape_configs:
+            - job_name: 'node_exporter1'
+              static_configs:
+                - targets: ['{{ groups["web"][0] }}:9100']
+
+            - job_name: 'nginx_log_exporter1'
+              static_configs:
+                - targets: ['{{ groups["web"][0] }}:4040']
+
+            - job_name: 'node_exporter2'
+              static_configs:
+                - targets: ['{{ groups["web"][1] }}:9100']
+
+            - job_name: 'nginx_log_exporter2'
+              static_configs:
+                - targets: ['{{ groups["web"][1] }}:4040']
+
+    - name: Создаем systemd Unit-файл для Prometheus
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/prometheus.service
+        content: |
+          [Unit]
+          Description=Prometheus
+          Wants=network-online.target
+          After=network-online.target
+
+          [Service]
+          User=prometheus
+          ExecStart=/usr/local/prometheus/prometheus \
+            --config.file=/etc/prometheus/prometheus.yml \
+            --storage.tsdb.path=/var/lib/prometheus/ \
+            --web.console.templates=/etc/prometheus/consoles \
+            --web.console.libraries=/etc/prometheus/console_libraries
+          Restart=always
+
+          [Install]
+          WantedBy=multi-user.target
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Перезагружаем systemd для применения изменений
+      ansible.builtin.systemd:
+        daemon_reload: yes
+
+    - name: Включаем и запускаем Prometheus
+      ansible.builtin.systemd:
+        name: prometheus
+        enabled: yes
+        state: started
+

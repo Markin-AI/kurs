@@ -1,0 +1,198 @@
+---
+
+- name: WEB
+  hosts: web
+  become: yes
+  tasks:
+
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Install nginx
+      apt:
+        name: nginx
+        state: present
+
+    - name: Replace index.html by template
+      template:
+        force: yes
+        src: /home/markin/ansible/configs/index.nginx-debian.j2
+        dest: /var/www/html/index.html
+
+    - name: Restart nginx
+      service:
+        name: nginx
+        state: restarted
+
+    - name: Убедиться, что wget установлен
+      ansible.builtin.apt:
+        name: wget
+        state: present
+        update_cache: yes
+
+    - name: Убедиться, что tar установлен
+      ansible.builtin.package:
+        name: tar
+        state: present
+
+    - name: Скачиваем Node Exporter
+      ansible.builtin.get_url:
+        url: "https://github.com/prometheus/node_exporter/releases/download/v1.6.1/node_exporter-1.6.1.linux-amd64.tar.gz"
+        dest: "/tmp/node_exporter.tar.gz"
+
+    - name: Распаковываем Node Exporter
+      ansible.builtin.unarchive:
+        src: "/tmp/node_exporter.tar.gz"
+        dest: "/usr/local/bin/"
+        remote_src: yes
+        extra_opts: [--strip-components=1]
+
+    - name: Создаем пользователя для Node Exporter
+      ansible.builtin.user:
+        name: node_exporter
+        shell: /usr/sbin/nologin
+
+    - name: Создаем системный Unit-файл для Node Exporter
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/node_exporter.service
+        content: |
+          [Unit]
+          Description=Node Exporter
+          Wants=network-online.target
+          After=network-online.target
+
+          [Service]
+          User=node_exporter
+          ExecStart=/usr/local/bin/node_exporter
+
+          [Install]
+          WantedBy=default.target
+
+    - name: Перезагружаем systemd
+      ansible.builtin.systemd:
+        daemon_reload: yes
+
+    - name: Включаем и запускаем Node Exporter
+      ansible.builtin.systemd:
+        name: node_exporter
+        enabled: yes
+        state: started
+
+    - name: Скачиваем NGINX Log Exporter
+      ansible.builtin.get_url:
+        url: "https://github.com/martin-helmich/prometheus-nginxlog-exporter/releases/download/v1.11.0/prometheus-nginxlog-exporter_1.11.0_linux_amd64.deb"
+        dest: "/tmp/prometheus-nginxlog-exporter.deb"
+
+    - name: Устанавливаем NGINX Log Exporter
+      ansible.builtin.apt:
+        deb: "/tmp/prometheus-nginxlog-exporter.deb"
+        state: present
+
+    - name: Создаем пользователя для NGINX Log Exporter
+      ansible.builtin.user:
+        name: nginxlog_exporter
+        shell: /usr/sbin/nologin
+
+    - name: Создаем директорию для конфигурационных файлов
+      ansible.builtin.file:
+        path: /etc/nginxlog-exporter/
+        state: directory
+        owner: nginxlog_exporter
+        group: nginxlog_exporter
+        mode: '0755'
+
+    - name: Создаем конфигурационный файл nginxlog-exporter
+      ansible.builtin.copy:
+        dest: /etc/nginxlog-exporter/config.yml
+        content: |
+          listen:
+            port: 4040
+          namespaces:
+            - name: nginx
+              format: "$remote_addr - $remote_user [$time_local] \"$request\" $status $body_bytes_sent \"$http_referer\" \"$http_user_agent\""
+              source_files:
+                - /var/log/nginx/access.log
+        owner: nginxlog_exporter
+        group: nginxlog_exporter
+        mode: '0644'
+
+    - name: Изменяем владельца и права доступа к лог-файлу NGINX
+      ansible.builtin.file:
+        path: /var/log/nginx/access.log
+        owner: nginxlog_exporter
+        group: nginxlog_exporter
+        mode: '0644'
+
+    - name: Создаем systemd Unit-файл для NGINX Log Exporter
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/nginxlog_exporter.service
+        content: |
+          [Unit]
+          Description=NGINX Log Exporter
+          After=network.target
+
+          [Service]
+          User=nginxlog_exporter
+          ExecStart=/usr/sbin/prometheus-nginxlog-exporter -config-file /etc/nginxlog-exporter/config.yml
+          Restart=always
+
+          [Install]
+          WantedBy=multi-user.target
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Перезагружаем systemd
+      ansible.builtin.systemd:
+        daemon_reload: yes
+
+    - name: Включаем и запускаем NGINX Log Exporter
+      ansible.builtin.systemd:
+        name: nginxlog_exporter
+        enabled: yes
+        state: started
+
+    - name: Install required packages
+      ansible.builtin.apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - wget
+        state: present
+        update_cache: yes
+
+    - name: Add the Filebeat repository from Yandex mirror
+      shell: echo "deb [trusted=yes] https://mirror.yandex.ru/mirrors/elastic/8/ stable main" | tee /etc/apt/sources.list.d/elastic-8.x.list
+
+    - name: Update APT cache
+      ansible.builtin.apt:
+        update_cache: yes
+
+    - name: Install Filebeat
+      ansible.builtin.apt:
+        name: filebeat
+        state: present
+        
+    - name: Replace filebeat config by template
+      template:
+        src: /home/markin/ansible/configs/filebeat.j2
+        dest: /etc/filebeat/filebeat.yml
+        force: yes        
+
+    - name: Add filebeat module nginx conf
+      copy:
+        src: /home/markin/ansible/configs/nginx.yml
+        dest: /etc/filebeat/modules.d/nginx.yml        
+
+    - name: systemctl daemon-reload
+      become: yes
+      shell: systemctl daemon-reload
+
+    - name: Ensure Filebeat is enabled and started
+      ansible.builtin.systemd:
+        name: filebeat
+        enabled: yes
+        state: started
+
+
