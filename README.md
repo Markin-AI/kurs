@@ -82,21 +82,21 @@ Cоздайте ВМ, разверните на ней Elasticsearch. Устан
 
 При развертке Terraform на бастион хост устанавливается Ansible и копируется приватный ssh ключ.
 
-[!Terraform](https://github.com/Markin-AI/kurs/blob/main/img/1.png)
+![Terraform](https://github.com/Markin-AI/kurs/blob/main/img/1.png)
 
 В папке Ansible находятся файлы, которые необходмо скопировать на бастион хост для дальнейшей развертки проекта.
 
-[!Ansible](https://github.com/Markin-AI/kurs/blob/main/img/2.png)
+![Ansible](https://github.com/Markin-AI/kurs/blob/main/img/2.png)
 
 Проверка load-balancer 51.250.35.81
 
-[!lb1](https://github.com/Markin-AI/kurs/blob/main/img/3_1.png)
+![lb1](https://github.com/Markin-AI/kurs/blob/main/img/3_1.png)
 
-[!lb2](https://github.com/Markin-AI/kurs/blob/main/img/3_2.png)
+![lb2](https://github.com/Markin-AI/kurs/blob/main/img/3_2.png)
 
 Настройка snapshot'ов
 
-[Snapshot](https://github.com/Markin-AI/kurs/blob/main/img/4.png)
+![Snapshot](https://github.com/Markin-AI/kurs/blob/main/img/4.png)
 
 [Gtafana](http://158.160.55.108:3000/)
 
