@@ -107,4 +107,4 @@ Cоздайте ВМ, разверните на ней Elasticsearch. Устан
 
 [kibana]  (http://158.160.44.81:5601/app/discover#)
 
-Настройка Dasboard'ов и Kibana проводилась в ручном режиме.
+Настройка Dasboard'ов Grafana и Kibana проводилась в ручном режиме.
